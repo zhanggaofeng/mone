@@ -42,8 +42,6 @@ public class ProjectService implements ProjectHelper {
     private NodeHelper nodeHelper;
     @Autowired
     private NodeDao nodeDao;
-    @Value("${def.project.gorup.id}")
-    private String defProjectGroupId;
     @Autowired
     private Cache cache;
 
@@ -182,31 +180,7 @@ public class ProjectService implements ProjectHelper {
         }
         NodeEntity curNode = nodeDao.getOneByOutId(OutIdTypeEnum.PROJECT.getCode(), param.getProjectId());
         if (curNode == null) {
-            Key key = Key.build(ModuleEnum.NODE_PRO_ADD_LOCK).keys(param.getProjectId());
-            if (!cache.get().lock(key)) {
-                return ResponseCode.OPER_FAIL.build("存在并发同步操作，请稍后重试");
-            }
-            try {
-                //刷新项目节点
-                NodeAddParam addParam = new NodeAddParam();
-                addParam.setAccount(param.getAccount());
-                addParam.setUserType(param.getUserType());
-                addParam.setUserId(param.getUserId());
-                addParam.setParentNodeId(Long.valueOf(defProjectGroupId));
-                addParam.setNodeName(projectVo.getName());
-                addParam.setDesc(projectVo.getDesc());
-                addParam.setType(NodeTypeEnum.PRO_TYPE.getCode());
-                addParam.setOutId(projectVo.getId());
-                addParam.setOutIdType(OutIdTypeEnum.PROJECT.getCode());
-                ResultVo<NodeVo> syncResult = nodeHelper.add(true, addParam);
-                log.info("项目详情查询，节点同步;syncResult={}", syncResult);
-                if (!syncResult.success()) {
-                    return ResponseCode.OPER_FAIL.build(syncResult.getMessage());
-                }
-                curNode = NodeUtil.toEntity(syncResult.getData());
-            } finally{
-                cache.get().unlock(key);
-            }
+            return ResponseCode.OPER_FAIL.build("项目节点不存在");
         }
         ResultVo<NodeVo> nodeResult = nodeHelper.get(param, curNode, param.isNeedParent());
         if (!nodeResult.success()) {

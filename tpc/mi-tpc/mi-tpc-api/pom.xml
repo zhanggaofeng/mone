@@ -11,6 +11,7 @@
 
 
     <dependencies>
+
         <dependency>
             <artifactId>mi-tpc-common</artifactId>
             <groupId>run.mone</groupId>

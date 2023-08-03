@@ -132,6 +132,57 @@ public class NodeService implements NodeHelper{
     }
 
     /**
+     * 外部节点列表查询
+     * @param param
+     * @return
+     */
+    public ResultVo<PageDataVo<ProjectOrgsVo>> projectAndOrgList(NodeAndOrgQryParam param) {
+        PageDataVo<ProjectOrgsVo> pageDataVo = param.buildPageDataVo(50);
+        List<NodeEntity> nodeEntities = nodeDao.getOutListByPage(OutIdTypeEnum.PROJECT.getCode(), NodeTypeEnum.PRO_TYPE.getCode(), NodeStatusEnum.ENABLE.getCode(), pageDataVo);
+        if (CollectionUtils.isEmpty(nodeEntities)) {
+            return ResponseCode.SUCCESS.build(pageDataVo);
+        }
+        Set<Long> nodeIds = nodeEntities.stream().filter(node -> node.getOutId() != null && node.getOutId() > 0).map(node -> node.getId()).collect(Collectors.toSet());
+        List<FlagEntity> flagEntities = flagDao.getListByNodeIds(nodeIds, FlagTypeEnum.ORG.getCode());
+        if (CollectionUtils.isEmpty(flagEntities)) {
+            return ResponseCode.SUCCESS.build(pageDataVo);
+        }
+        List<FlagEntity> flagList = null;
+        Map<Long, List<FlagEntity>> flagMap = new HashMap<>();
+        for (FlagEntity flag : flagEntities) {
+            flagList = flagMap.get(flag.getParentId());
+            if (flagList == null) {
+                flagList = new ArrayList<>();
+                flagMap.put(flag.getParentId(), flagList);
+            }
+            flagList.add(flag);
+        }
+        List<ProjectOrgsVo> poVoList = new ArrayList<>();
+        for (NodeEntity node : nodeEntities) {
+            if (node.getOutId() == null || node.getOutId() <= 0) {
+                continue;
+            }
+            flagList = flagMap.get(node.getId());
+            if (CollectionUtils.isEmpty(flagList)) {
+                continue;
+            }
+            Collections.sort(flagList, (f1, f2) -> f1.getFlagVal().compareTo(f2.getFlagVal()));
+            ProjectOrgsVo poVo = new ProjectOrgsVo();
+            poVo.setId(node.getOutId());
+            poVo.setName(node.getNodeName());
+            poVo.setOrgVos(flagList.stream().map(flag -> {
+                OrgInfoVo orgVo = new OrgInfoVo();
+                orgVo.setIdPath(flag.getFlagKey());
+                orgVo.setNamePath(flag.getFlagName());
+                return orgVo;
+            }).collect(Collectors.toList()));
+            poVoList.add(poVo);
+        }
+        pageDataVo.setList(poVoList);
+        return ResponseCode.SUCCESS.build(pageDataVo);
+    }
+
+    /**
      * 分页查询
      * @param param
      * @return

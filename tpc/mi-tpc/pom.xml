@@ -156,6 +156,12 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <checkConfigurationFile>false</checkConfigurationFile>
+                    <ipWhite>
+                        <param>5.1.3.201810200350</param>
+                    </ipWhite>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

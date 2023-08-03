@@ -1,5 +1,6 @@
 package com.xiaomi.mone.tpc.common.vo;
 
+import com.xiaomi.mone.application.api.bo.ProjectVo;
 import lombok.Data;
 import lombok.ToString;
 

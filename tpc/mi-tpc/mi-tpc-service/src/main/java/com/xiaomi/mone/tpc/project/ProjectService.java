@@ -11,7 +11,6 @@ import com.xiaomi.mone.tpc.common.util.GsonUtil;
 import com.xiaomi.mone.tpc.common.vo.*;
 import com.xiaomi.mone.tpc.dao.entity.NodeEntity;
 import com.xiaomi.mone.tpc.dao.impl.NodeDao;
-import com.xiaomi.mone.tpc.iam.IamHelper;
 import com.xiaomi.mone.tpc.login.util.UserUtil;
 import com.xiaomi.mone.tpc.login.vo.AuthUserVo;
 import com.xiaomi.mone.tpc.node.NodeFlagHelper;
@@ -43,10 +42,6 @@ public class ProjectService implements ProjectHelper {
     private NodeHelper nodeHelper;
     @Autowired
     private NodeDao nodeDao;
-    @Autowired
-    private NodeFlagHelper nodeFlagHelper;
-    @Autowired
-    private IamHelper iamHelper;
     @Value("${def.project.gorup.id}")
     private String defProjectGroupId;
     @Autowired
@@ -75,13 +70,6 @@ public class ProjectService implements ProjectHelper {
         log.info("rpc-createProject调用request={}, response={}", GsonUtil.gsonString(param.getProjectVo()), GsonUtil.gsonString(projectResult));
         if (projectResult == null || projectResult.getData() == null || !projectResult.isSuccess()) {
             return ResponseCode.OPER_FAIL.build(projectResult.getMessage());
-        }
-        if (!parentNode.getId().equals(defProjectGroupId)) {
-            FlagVo flagVo = nodeFlagHelper.getFirstOneByParentId(parentNode.getId(), FlagTypeEnum.IAM.getCode());
-            if (flagVo != null) {
-                IamResInfoVo iamResInfoVo = iamHelper.createResouce(flagVo.getFlagKey(), projectResult.getData().getId(), projectResult.getData().getName());
-                log.info("项目创建,iamId={}下面创建资源{}", flagVo.getFlagKey(), iamResInfoVo);
-            }
         }
         NodeAddParam nodeParam = buildNodeAddParam(param, projectResult.getData());
         ResultVo<NodeVo> nodeResult = nodeHelper.realAdd(nodeParam, parentNode);
@@ -143,20 +131,6 @@ public class ProjectService implements ProjectHelper {
             nodeParam.setDesc(param.getProjectVo().getDesc());
             nodeParam.setOrgParam(param.getOrgParam());
             nodeHelper.realEdit(nodeParam, curNode);
-            if (!curNode.getParentId().equals(defProjectGroupId)) {
-                FlagVo curFlagVo = nodeFlagHelper.getFirstOneByParentId(curNode.getParentId(), FlagTypeEnum.IAM.getCode());
-                if (curFlagVo != null) {
-                    boolean exist = false;
-                    List<IamResInfoVo> iamResList = iamHelper.qryResouces(curFlagVo.getFlagKey());
-                    if (CollectionUtils.isNotEmpty(iamResList)) {
-                        exist = iamResList.stream().filter(iamRes -> String.valueOf(param.getProjectVo().getId()).equals(iamRes.getResourceId())).findAny().isPresent();
-                    }
-                    if (!exist) {
-                        IamResInfoVo iamResInfoVo = iamHelper.createResouce(curFlagVo.getFlagKey(), param.getProjectVo().getId(), curNode.getNodeName());
-                        log.info("项目编辑,iamId={}下面创建资源{}", curFlagVo.getFlagKey(), iamResInfoVo);
-                    }
-                }
-            }
         }
         if (param.getParentNodeId() != null && !param.getParentNodeId().equals(curNode.getParentId())) {
             NodeMoveParam nodeParam = new NodeMoveParam();
@@ -166,24 +140,6 @@ public class ProjectService implements ProjectHelper {
             nodeParam.setFromId(curNode.getId());
             nodeParam.setToId(param.getParentNodeId());
             nodeHelper.move(true, nodeParam);
-            if (!curNode.getParentId().equals(defProjectGroupId)) {
-                //删除老资源-弱依赖
-                FlagVo curFlagVo = nodeFlagHelper.getFirstOneByParentId(curNode.getParentId(), FlagTypeEnum.IAM.getCode());
-                if (curFlagVo != null) {
-                    iamHelper.deleteResouce(curFlagVo.getFlagKey(), param.getProjectVo().getId());
-                    log.info("项目编辑-移动,iamId={}下面删除资源", curFlagVo.getFlagKey());
-                }
-            }
-            if (!param.getParentNodeId().equals(defProjectGroupId)) {
-                //添加新资源-弱依赖
-                FlagVo newFlagVo = nodeFlagHelper.getFirstOneByParentId(param.getParentNodeId(), FlagTypeEnum.IAM.getCode());
-                if (newFlagVo != null) {
-                    String projectName = StringUtils.isNotBlank(param.getProjectVo().getName()) ? param.getProjectVo().getName() : param.getNodeName();
-                    projectName = StringUtils.isNotBlank(projectName) ? projectName : curNode.getNodeName();
-                    IamResInfoVo iamResInfoVo = iamHelper.createResouce(newFlagVo.getFlagKey(), param.getProjectVo().getId(), projectName);
-                    log.info("项目编辑-移动,iamId={}下面创建资源{}", newFlagVo.getFlagKey(), iamResInfoVo);
-                }
-            }
         }
         return ResponseCode.SUCCESS.build();
     }
@@ -207,13 +163,6 @@ public class ProjectService implements ProjectHelper {
             log.info("rpc-deleteProject调用account={}, projectId={}, response={}", fullAccount, param.getProjectId(), GsonUtil.gsonString(projectResult));
             if (projectResult == null || projectResult.getData() == null || !projectResult.isSuccess()) {
                 return ResponseCode.OPER_FAIL.build(projectResult.getMessage());
-            }
-            if (!curNode.getParentId().equals(defProjectGroupId)) {
-                FlagVo flagVo = nodeFlagHelper.getFirstOneByParentId(curNode.getParentId(), FlagTypeEnum.IAM.getCode());
-                if (flagVo != null) {
-                    iamHelper.deleteResouce(flagVo.getFlagKey(), param.getProjectId());
-                    log.info("项目删除,iamId={}下面删除资源", flagVo.getFlagKey());
-                }
             }
         }
         if (curNode != null) {

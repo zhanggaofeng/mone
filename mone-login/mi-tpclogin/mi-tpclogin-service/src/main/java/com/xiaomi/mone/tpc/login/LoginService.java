@@ -7,25 +7,27 @@ import com.xiaomi.mone.tpc.cache.Cache;
 import com.xiaomi.mone.tpc.cache.enums.ModuleEnum;
 import com.xiaomi.mone.tpc.cache.key.Key;
 import com.xiaomi.mone.tpc.common.param.UserRegisterParam;
+import com.xiaomi.mone.tpc.common.vo.UserVo;
+import com.xiaomi.mone.tpc.dao.entity.AccountEntity;
+import com.xiaomi.mone.tpc.dao.impl.AccountDao;
 import com.xiaomi.mone.tpc.login.common.enums.AccountStatusEnum;
 import com.xiaomi.mone.tpc.login.common.enums.AccountTypeEnum;
-import com.xiaomi.mone.tpc.login.common.util.MD5Util;
 import com.xiaomi.mone.tpc.login.common.param.*;
+import com.xiaomi.mone.tpc.login.common.util.GsonUtil;
+import com.xiaomi.mone.tpc.login.common.util.MD5Util;
 import com.xiaomi.mone.tpc.login.common.vo.AuthAccountVo;
 import com.xiaomi.mone.tpc.login.common.vo.LoginInfoVo;
 import com.xiaomi.mone.tpc.login.common.vo.ResponseCode;
 import com.xiaomi.mone.tpc.login.common.vo.ResultVo;
-import com.xiaomi.mone.tpc.dao.entity.AccountEntity;
-import com.xiaomi.mone.tpc.dao.impl.AccountDao;
 import com.xiaomi.mone.tpc.login.util.Auth2Util;
 import com.xiaomi.mone.tpc.login.vo.AuthTokenVo;
 import com.xiaomi.mone.tpc.login.vo.AuthUserVo;
 import com.xiaomi.mone.tpc.util.EmailUtil;
 import com.xiaomi.mone.tpc.util.TokenUtil;
+import com.xiaomi.youpin.infra.rpc.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -64,9 +66,18 @@ public class LoginService {
         if (mgr == null) {
             return ResponseCode.OPER_ILLEGAL.build();
         }
-        AuthUserVo authUserVo = mgr.getUserVo(code, pageUrl, vcode, state);
-        if (authUserVo == null) {
-            return ResponseCode.NO_OPER_PERMISSION.build();
+        ResultVo<AuthUserVo> authUserVoRst = mgr.getUserVo(code, pageUrl, vcode, state);
+        if (!authUserVoRst.success()) {
+            return authUserVoRst;
+        }
+        AuthUserVo authUserVo = authUserVoRst.getData();
+        UserRegisterParam registerParam = new UserRegisterParam();
+        registerParam.setAccount(authUserVo.getAccount());
+        registerParam.setUserType(authUserVo.getUserType());
+        registerParam.setContent(GsonUtil.gsonString(authUserVo));
+        Result<UserVo> result = userFacade.register(registerParam);
+        if (result.getCode() != 0) {
+            return ResponseCode.OPER_FAIL.build(result.getMessage());
         }
         authUserVo.setState(state);
         Key key = null;
@@ -82,7 +93,7 @@ public class LoginService {
         if (!cache.get().set(key, authUserVo)) {
             return ResponseCode.UNKNOWN_ERROR.build();
         }
-        return ResponseCode.SUCCESS.build(authUserVo);
+        return authUserVoRst;
     }
 
     public ResultVo logout(AuthTokenVo authToken) {
@@ -162,7 +173,10 @@ public class LoginService {
         UserRegisterParam registerParam = new UserRegisterParam();
         registerParam.setAccount(entity.getAccount());
         registerParam.setUserType(accountTypeEnum.getUserType());
-        userFacade.register(registerParam);
+        Result<UserVo> userVoResult = userFacade.register(registerParam);
+        if (userVoResult.getCode() != 0) {
+            return ResponseCode.OPER_FAIL.build(userVoResult.getMessage());
+        }
         return ResponseCode.SUCCESS.build();
     }
 
@@ -213,15 +227,15 @@ public class LoginService {
             return ResponseCode.USER_DISABLED.build();
         }
         AuthUserVo authUserVo = new AuthUserVo();
+        authUserVo.setExprTime((int)(ModuleEnum.LOGIN.getUnit().toSeconds(ModuleEnum.LOGIN.getTime())));
+        authUserVo.setAccount(entity.getAccount());
+        authUserVo.setUserType(accountTypeEnum.getUserType());
+        authUserVo.setToken(TokenUtil.createToken(authUserVo.getExprTime(), authUserVo.getAccount(), authUserVo.getUserType()));
         if (AccountTypeEnum.EMAIL.equals(accountTypeEnum)) {
             authUserVo.setEmail(param.getAccount());
         }
         authUserVo.setState(param.getState());
-        authUserVo.setAccount(entity.getAccount());
-        authUserVo.setUserType(accountTypeEnum.getUserType());
-        authUserVo.setExprTime((int)(ModuleEnum.LOGIN.getUnit().toSeconds(ModuleEnum.LOGIN.getTime())));
         authUserVo.setName(entity.getName());
-        authUserVo.setToken(TokenUtil.createToken(authUserVo.getExprTime(), authUserVo.getAccount(), authUserVo.getUserType()));
         Key key = null;
         //auth2 模式登陆，code缓存
         if (StringUtils.isNotBlank(param.getVcode())) {

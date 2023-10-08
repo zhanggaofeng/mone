@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 
@@ -46,6 +45,12 @@ public class NodeController {
     @ArgCheck
     @RequestMapping(value = "/list")
     public ResultVo<PageDataVo<NodeVo>> list(@RequestBody NodeQryParam param) {
+        return nodeService.list(param);
+    }
+
+    @ArgCheck(needUser = false, needToken = true)
+    @RequestMapping(value = "/inner_list")
+    public ResultVo<PageDataVo<NodeVo>> innerList(@RequestBody NodeQryParam param) {
         return nodeService.list(param);
     }
 

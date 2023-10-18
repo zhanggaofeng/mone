@@ -5,7 +5,7 @@
 
     <modelVersion>4.0.0</modelVersion>
     <groupId>run.mone</groupId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.1-SNAPSHOT</version>
     <artifactId>mi-tpc-common</artifactId>
     <name>${project.artifactId}</name>
     <description>The project of mi-tpc-common</description>
@@ -20,10 +20,9 @@
     </licenses>
 
     <dependencies>
-        <!--project TODO-->
         <dependency>
+            <groupId>run.mone</groupId>
             <artifactId>application-manager-api</artifactId>
-            <groupId>com.xiaomi.mone</groupId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
